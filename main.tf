@@ -10,8 +10,15 @@ resource "google_container_cluster" "gke_cluster" {
   location           = var.region
   initial_node_count = 1
 
-  # Default Node Pool 제거
-  remove_default_node_pool = true
+  deletion_protection = false
+
+  # 네트워크 설정 (명시적으로 지정)
+  network    = "projects/advance-engine-444818-p0/global/networks/default"
+  subnetwork = "projects/advance-engine-444818-p0/regions/asia-northeast3/subnetworks/default"
+
+  # Autopilot 및 TPU 비활성화 (명시적으로 설정)
+  enable_autopilot = false
+  enable_tpu       = false
 
   # 내부 IP 사용 설정
   ip_allocation_policy {}
@@ -28,11 +35,11 @@ resource "google_container_cluster" "gke_cluster" {
 resource "google_container_node_pool" "primary_nodes" {
   name       = "primary-nodes"
   cluster    = google_container_cluster.gke_cluster.name
-  node_count = 2
+  node_count = 1
 
   node_config {
     machine_type       = "e2-medium"
-    disk_size_gb       = 50
+    disk_size_gb       = 20
     oauth_scopes       = ["https://www.googleapis.com/auth/cloud-platform"]
     service_account    = "default"
     tags               = ["no-external-ip"]
@@ -46,9 +53,6 @@ resource "google_container_node_pool" "primary_nodes" {
     shielded_instance_config {
       enable_secure_boot = true
     }
-
-    # 네트워크 태그 추가
-    network_tags = ["no-external-ip"]
   }
 
   # 노드 자동 업그레이드 및 복구 설정
