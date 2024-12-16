@@ -12,6 +12,7 @@ resource "google_container_cluster" "gke_cluster" {
 
   node_config {
     machine_type = "e2-medium"
+    disk_size_gb = 50  # 디스크 크기 줄이기 (기본값은 100GB)
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"
     ]
@@ -22,6 +23,7 @@ resource "google_container_cluster" "gke_cluster" {
 resource "google_sql_database_instance" "mysql_instance" {
   name = "mysql-instance"
   region = var.region
+  database_version = "MYSQL_8_0"  # MySQL 버전 명시
 
   settings {
     tier = "db-f1-micro" # 최소 사양
