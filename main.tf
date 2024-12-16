@@ -1,48 +1,65 @@
 provider "google" {
-  version = "~> 3.400"
-  project = var.project_id
-  region  = var.region
+  credentials = file("advance-engine-444818-p0-cfbcd582bdbf.json") # 서비스 계정 키 파일 경로
+  project     = "advance-engine-444818-p0"                        # GCP 프로젝트 ID
+  region      = "asia-northeast3"                                # 리전
 }
 
-resource "google_compute_network" "vpc" {
-  name = "${var.project_id}-vpc"
-  auto_create_subnetworks = false
-}
+# GKE Kubernetes 클러스터 생성
+resource "google_container_cluster" "gke_cluster" {
+  name               = "k8s-cluster"
+  location           = var.region
+  initial_node_count = 3
 
-resource "google_compute_subnetwork" "subnet" {
-  name          = "${var.project_id}-subnet"
-  region        = var.region
-  network       = google_compute_network.vpc.name
-  ip_cidr_range = "10.10.0.0/24"
-}
-
-resource "google_container_cluster" "primary" {
-  name                 = "${var.project_id}-gke"
-  location             = var.region
-  min_master_version   = "1.23"
-  remove_default_node_pool = true
-  initial_node_count   = 1
-  network              = google_compute_network.vpc.name
-  subnetwork           = google_compute_subnetwork.subnet.name
-}
-
-resource "google_container_node_pool" "primary_nodes" {
-  name       = "${google_container_cluster.primary.name}-node-pool"
-  location   = var.region
-  cluster    = google_container_cluster.primary.name
-  node_count = var.gke_num_nodes
   node_config {
+    machine_type = "e2-medium"
     oauth_scopes = [
-      "https://www.googleapis.com/auth/logging.write",
-      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/cloud-platform"
     ]
-    labels = {
-      env = var.project_id
-    }
-    machine_type = var.gke_machine_type
-    tags         = ["gke-node", "${var.project_id}-gke"]
-    metadata = {
-      disable-legacy-endpoints = "true"
-    }
   }
+}
+
+# Cloud SQL 인스턴스 생성
+resource "google_sql_database_instance" "mysql_instance" {
+  name = "mysql-instance"
+  region = var.region
+
+  settings {
+    tier = "db-f1-micro" # 최소 사양
+    availability_type = "ZONAL"
+  }
+}
+
+# Cloud SQL 데이터베이스 생성
+resource "google_sql_database" "db" {
+  name     = "mydatabase"
+  instance = google_sql_database_instance.mysql_instance.name
+}
+
+# Cloud SQL 사용자 생성
+resource "google_sql_user" "user" {
+  name     = "api_user"
+  instance = google_sql_database_instance.mysql_instance.name
+  password = "password123"
+}
+
+# GKE 클러스터 인증 정보 출력
+output "gke_cluster_endpoint" {
+  value = google_container_cluster.gke_cluster.endpoint
+}
+
+output "gke_cluster_ca_certificate" {
+  value = google_container_cluster.gke_cluster.master_auth[0].cluster_ca_certificate
+}
+
+# Cloud SQL 정보 출력
+output "cloud_sql_instance_connection_name" {
+  value = google_sql_database_instance.mysql_instance.connection_name
+}
+
+output "cloud_sql_user" {
+  value = google_sql_user.user.name
+}
+
+output "cloud_sql_database_name" {
+  value = google_sql_database.db.name
 }
